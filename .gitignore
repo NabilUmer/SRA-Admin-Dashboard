@@ -1,0 +1,16 @@
+# Ignore Java dependencies
+.m2/
+target/
+*.jar
+.mvn/
+mvnw
+mvnw.cmd
+
+# Ignore React dependencies
+node_modules/
+dist/
+.env
+
+# Ignore System junk
+.DS_Store
+Thumbs.db

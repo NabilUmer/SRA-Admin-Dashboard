@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SRA ? Resources</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    header { display:flex; align-items:baseline; gap:1rem; }
+    h1 { margin:0; }
+    form { display:flex; gap:.5rem; flex-wrap:wrap; margin:1rem 0; }
+    input, button { padding:.6rem .8rem; font-size:1rem; }
+    table { border-collapse:collapse; width:100%; }
+    th, td { border:1px solid #ddd; padding:.5rem .6rem; text-align:left; }
+    tbody tr:nth-child(even){ background:#fafafa; }
+    .ok { color: #0a0; font-weight:600; }
+    footer { margin-top:2rem; color:#555; font-size:.9rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Smart Resource Allocator</h1>
+    <span id="version"></span>
+    <span id="health" class="ok"></span>
+  </header>
+
+  <section>
+    <h2>Create resource</h2>
+    <form id="createForm">
+      <input id="name" placeholder="Name (e.g., GPU A)" required />
+      <input id="qty" type="number" min="0" placeholder="Quantity" required />
+      <button type="submit">Create</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>Resources</h2>
+    <table>
+      <thead><tr><th>ID</th><th>Name</th><th>Quantity</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </section>
+
+  <footer>
+    <p>H2 Console: <code>/h2-console</code> (JDBC URL <code>jdbc:h2:mem:sra</code>)</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
