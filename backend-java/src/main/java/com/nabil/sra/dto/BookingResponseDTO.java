@@ -9,6 +9,7 @@ public class BookingResponseDTO {
     private OffsetDateTime endTime;
     private String status;
 
+    // Constructor used by your BookingService to wrap database results
     public BookingResponseDTO(Long id, Long resourceId, OffsetDateTime startTime, OffsetDateTime endTime, String status) {
         this.id = id;
         this.resourceId = resourceId;
@@ -17,6 +18,7 @@ public class BookingResponseDTO {
         this.status = status;
     }
 
+    // Getters
     public Long getId() { return id; }
     public Long getResourceId() { return resourceId; }
     public OffsetDateTime getStartTime() { return startTime; }
