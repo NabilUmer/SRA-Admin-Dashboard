@@ -44,9 +44,9 @@ function App() {
     });
 
     if (response.status === 409) {
-      setMessage("CONFLICT: Node is already reserved!");
+      setMessage("?? CONFLICT: Node is already reserved!");
     } else if (response.ok) {
-      setMessage("SUCCESS: Node allocated!");
+      setMessage("? SUCCESS: Node allocated!");
       loadData();
     }
     setIsAllocating(null);
@@ -55,25 +55,27 @@ function App() {
 
   const exportToCSV = () => {
     if (bookings.length === 0) return;
-    const headers = ["ID", "Resource", "Time", "Status"];
-    const rows = bookings.map(b => {
-      const resName = resources.find(r => r.id === b.resourceId)?.name || "Node";
-      return [`ALLOC-${b.id}`, resName, new Date(b.startTime).toLocaleString("en-US", {timeZone: "America/Los_Angeles"}), "CONFIRMED"];
-    });
+    const headers = ["ID", "ResourceID", "Time", "Status"];
+    const rows = bookings.map(b => [
+      `ALLOC-${b.id}`, 
+      b.resourceId, 
+      new Date(b.startTime).toLocaleString("en-US", {timeZone: "America/Los_Angeles"}), 
+      "CONFIRMED"
+    ]);
     const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "SRA_Audit_Log.csv";
+    link.download = `SRA_Audit_Log.csv`;
     link.click();
   };
 
   return (
-    <div style={{ margin: 0, padding: '40px', fontFamily: 'sans-serif', backgroundColor: '#0f172a', minHeight: '100vh', width: '100vw', position: 'absolute', left: 0, top: 0, boxSizing: 'border-box', color: '#f8fafc' }}>
+    <div style={{ margin: 0, padding: '40px', fontFamily: '"Inter", sans-serif', backgroundColor: '#0f172a', minHeight: '100vh', width: '100vw', position: 'absolute', left: 0, top: 0, boxSizing: 'border-box', color: '#f8fafc' }}>
       <header style={{ maxWidth: '1200px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #1e293b', paddingBottom: '25px' }}>
         <div>
-          <h1 style={{ color: '#60a5fa', margin: 0, fontSize: '3rem', fontWeight: '900' }}>SRA Admin Dashboard</h1>
+          <h1 style={{ color: '#60a5fa', margin: 0, fontSize: '3rem', fontWeight: '900', letterSpacing: '-0.04em' }}>SRA Admin Dashboard</h1>
           <p style={{ color: '#94a3b8', fontWeight: '600', margin: '8px 0 0 0' }}>Week 4: Administrative Observability | Nabil Umer</p>
         </div>
         <button onClick={exportToCSV} style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800' }}>Export Audit Log</button>
@@ -94,7 +96,7 @@ function App() {
 
       <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto', background: '#1e293b', padding: '35px', borderRadius: '24px' }}>
         <form onSubmit={handleDeploy} style={{ display: 'flex', gap: '20px' }}>
-          <input type="text" placeholder="GPU Name" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '18px', flex: 2, borderRadius: '14px', border: 'none', background: '#0f172a', color: 'white' }} required />
+          <input type="text" placeholder="GPU Name (e.g. NVIDIA RTX 4090)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '18px', flex: 2, borderRadius: '14px', border: 'none', background: '#0f172a', color: 'white' }} required />
           <button type="submit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0 40px', borderRadius: '14px', cursor: 'pointer', fontWeight: '800' }}>Deploy Node</button>
         </form>
       </section>
@@ -104,7 +106,7 @@ function App() {
           const isBusy = bookings.some(b => b.resourceId === res.id);
           return (
             <div key={res.id} style={{ background: '#1e293b', padding: '40px', borderRadius: '28px', textAlign: 'center', border: isBusy ? '2px solid #ef4444' : '2px solid #10b981' }}>
-              <span style={{ color: isBusy ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{isBusy ? 'BUSY' : 'AVAILABLE'}</span>
+              <span style={{ color: isBusy ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{isBusy ? '? BUSY' : '? AVAILABLE'}</span>
               <h3 style={{ fontSize: '1.8rem', fontWeight: '900', margin: '15px 0' }}>{res.name}</h3>
               <p style={{ color: '#94a3b8', fontSize: '1.2rem', marginBottom: '35px' }}>Stock: <strong>{isBusy ? 0 : res.quantity}</strong> units</p>
               <button onClick={() => handleBooking(res.id)} disabled={isBusy || isAllocating === res.id} style={{ background: isBusy ? '#475569' : '#1e3a8a', color: 'white', border: 'none', padding: '20px', borderRadius: '18px', width: '100%', fontWeight: '800', cursor: isBusy ? 'not-allowed' : 'pointer' }}>
