@@ -1,53 +1,34 @@
 package com.nabil.sra.service;
-
-import com.nabil.sra.dto.BookingRequestDTO;
-import com.nabil.sra.dto.BookingResponseDTO;
+import com.nabil.sra.dto.*;
 import com.nabil.sra.entity.BookingEntity;
-import com.nabil.sra.repository.BookingRepository;
-import com.nabil.sra.repository.ResourceRepository;
+import com.nabil.sra.repository.*;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 public class BookingService {
-    private final BookingRepository bookingRepository;
-    private final ResourceRepository resourceRepository;
-
-    public BookingService(BookingRepository bookingRepository, ResourceRepository resourceRepository) {
-        this.bookingRepository = bookingRepository;
-        this.resourceRepository = resourceRepository;
+    private final BookingRepository bookingRepo;
+    private final ResourceRepository resRepo;
+    public BookingService(BookingRepository bookingRepo, ResourceRepository resRepo) {
+        this.bookingRepo = bookingRepo;
+        this.resRepo = resRepo;
     }
-
-    public BookingResponseDTO createBooking(BookingRequestDTO request) {
-        var resource = resourceRepository.findById(request.getResourceId())
-                .orElseThrow(() -> new RuntimeException("Resource not found"));
-        
+    public BookingResponseDTO createBooking(BookingRequestDTO req) {
+        if (bookingRepo.existsConflict(req.getResourceId(), req.getStartTime(), req.getEndTime())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Resource already booked.");
+        }
+        var resource = resRepo.findById(req.getResourceId()).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         BookingEntity booking = new BookingEntity();
         booking.setResource(resource);
-        booking.setStartTime(request.getStartTime());
-        booking.setEndTime(request.getEndTime());
-        
-        BookingEntity saved = bookingRepository.save(booking);
-        
-        return new BookingResponseDTO(
-            saved.getId(),
-            saved.getResource().getId(),
-            saved.getStartTime(),
-            saved.getEndTime(),
-            "CONFIRMED"
-        );
+        booking.setStartTime(req.getStartTime());
+        booking.setEndTime(req.getEndTime());
+        BookingEntity saved = bookingRepo.save(booking);
+        return new BookingResponseDTO(saved.getId(), saved.getResource().getId(), saved.getStartTime(), saved.getEndTime(), "CONFIRMED");
     }
-
     public List<BookingResponseDTO> getAllBookings() {
-        return bookingRepository.findAll().stream()
-                .map(booking -> new BookingResponseDTO(
-                    booking.getId(),
-                    booking.getResource().getId(),
-                    booking.getStartTime(),
-                    booking.getEndTime(),
-                    "CONFIRMED"
-                ))
-                .collect(Collectors.toList());
+        return bookingRepo.findAll().stream().map(b -> new BookingResponseDTO(b.getId(), b.getResource().getId(), b.getStartTime(), b.getEndTime(), "CONFIRMED")).collect(Collectors.toList());
     }
 }

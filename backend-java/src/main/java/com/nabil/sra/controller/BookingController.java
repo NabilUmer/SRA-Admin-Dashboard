@@ -1,31 +1,19 @@
 package com.nabil.sra.controller;
-
-import com.nabil.sra.dto.BookingRequestDTO;
-import com.nabil.sra.dto.BookingResponseDTO;
+import com.nabil.sra.dto.*;
 import com.nabil.sra.service.BookingService;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173")
 @RestController
-@RequestMapping("/bookings")
+@RequestMapping("/api/bookings")
+@CrossOrigin(origins = "http://localhost:5173")
 public class BookingController {
-    private final BookingService bookingService;
-
-    public BookingController(BookingService bookingService) {
-        this.bookingService = bookingService;
-    }
-
+    private final BookingService service;
+    public BookingController(BookingService service) { this.service = service; }
     @PostMapping
-    public ResponseEntity<BookingResponseDTO> create(@RequestBody BookingRequestDTO request) {
-        BookingResponseDTO response = bookingService.createBooking(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
+    @ResponseStatus(HttpStatus.CREATED)
+    public BookingResponseDTO create(@RequestBody BookingRequestDTO req) { return service.createBooking(req); }
     @GetMapping
-    public List<BookingResponseDTO> getAllBookings() {
-        return bookingService.getAllBookings(); 
-    }
+    public List<BookingResponseDTO> getAll() { return service.getAllBookings(); }
 }

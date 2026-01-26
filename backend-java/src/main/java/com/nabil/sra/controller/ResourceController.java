@@ -1,36 +1,27 @@
 package com.nabil.sra.controller;
 
-import com.nabil.sra.service.ResourceService;
 import com.nabil.sra.entity.ResourceEntity;
-import com.nabil.sra.dto.ResourceRequest;
-import com.nabil.sra.dto.PatchResourceRequest;
-import org.springframework.http.ResponseEntity;
+import com.nabil.sra.repository.ResourceRepository;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
-import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.List;
 
-@CrossOrigin(origins = "http://localhost:5173") // Unlocks the "Security Gate"
 @RestController
-@RequestMapping("/resources")
+@RequestMapping("/api/resources")
+@CrossOrigin(origins = "http://localhost:5173")
 public class ResourceController {
-    private final ResourceService service;
+    private final ResourceRepository repo;
 
-    public ResourceController(ResourceService service) {
-        this.service = service;
-    }
+    public ResourceController(ResourceRepository repo) { this.repo = repo; }
 
     @GetMapping
-    public List<ResourceEntity> list() { return service.list(); }
-    @DeleteMapping("/{id}")
-public ResponseEntity<Void> delete(@PathVariable Long id) {
-    service.delete(id); // Ensure your ResourceService has a delete(id) method
-    return ResponseEntity.noContent().build();
-}
+    public List<ResourceEntity> getAll() { return repo.findAll(); }
 
-    @PostMapping
-    public ResponseEntity<ResourceEntity> create(@Valid @RequestBody ResourceRequest req) {
-        ResourceEntity e = service.create(req);
-        return ResponseEntity.created(URI.create("/resources/" + e.getId())).body(e);
+    @PostMapping("/seed")
+    public ResourceEntity seed(@RequestBody ResourceEntity resource) {
+        resource.setCreatedAt(OffsetDateTime.now());
+        resource.setUpdatedAt(OffsetDateTime.now());
+        resource.setVersion(0L);
+        return repo.save(resource);
     }
 }

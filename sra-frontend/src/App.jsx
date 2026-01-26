@@ -14,13 +14,13 @@ function App() {
   const loadData = async () => {
     try {
       console.log("Fetching fresh data from backend...");
-      const res = await fetch('http://localhost:8080/resources');
+      // FIXED: Added /api prefix to match Java Controllers
+      const res = await fetch('http://localhost:8080/api/resources');
       const rData = await res.json();
       setResources(rData);
 
-      const book = await fetch('http://localhost:8080/bookings');
+      const book = await fetch('http://localhost:8080/api/bookings');
       const bData = await book.json();
-      console.log("Bookings received:", bData);
       setBookings(bData);
     } catch (err) {
       console.error("Dashboard sync failed. Is the Java server running?", err);
@@ -33,10 +33,11 @@ function App() {
   const handleAddResource = async (e) => {
     e.preventDefault();
     try {
-      await fetch('http://localhost:8080/resources', {
+      // FIXED: Changed to /api/resources/seed to match our new seed endpoint
+      await fetch('http://localhost:8080/api/resources/seed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `${newName} (${newSpec})`, quantity: parseInt(newQty), active: true })
+        body: JSON.stringify({ name: `${newName} (${newSpec})`, quantity: parseInt(newQty) })
       });
       setMessage(`🚀 Infrastructure: Node "${newName}" successfully deployed.`);
       setNewName('');
@@ -47,46 +48,40 @@ function App() {
     setTimeout(() => setMessage(''), 4000);
   };
 
-  // 3. FIXED: Allocation & Log Synchronization
+  // 3. UPDATED: Allocation & Conflict Logic
   const handleBooking = async (id) => {
     const target = resources.find(r => r.id === id);
     if (!target || target.quantity <= 0) return;
 
     setIsAllocating(id);
-    console.log(`Starting allocation for Node_${id}...`);
-
+    
     try {
-      // Step A: Send Request to BookingController (matches your DTOs)
-      const bRes = await fetch('http://localhost:8080/bookings', {
+      // Step A: Send Request to BookingController
+      const bRes = await fetch('http://localhost:8080/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           resourceId: Number(id), 
-          startTime: new Date().toISOString(),
-          endTime: new Date(Date.now() + 7200000).toISOString() // 2-hour window
+          // Testing with the fixed time window we used in terminal
+          startTime: "2026-01-25T10:00:00Z", 
+          endTime: "2026-01-25T12:00:00Z" 
         })
       });
 
-      if (!bRes.ok) {
-        const errText = await bRes.text();
-        throw new Error(`Server Error: ${errText}`);
+      // WEEK 3 SPECIAL: Handle 409 Conflict
+      if (bRes.status === 409) {
+        setMessage(`⚠️ CONFLICT: Node_${id} is already reserved for this time slot!`);
+        return;
       }
 
-      console.log("Booking created successfully. Updating inventory...");
+      if (!bRes.ok) throw new Error(`Server Error`);
 
-      // Step B: Update Inventory Stock
-      await fetch(`http://localhost:8080/resources/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...target, quantity: target.quantity - 1 })
-      });
-
-      // Step C: Force a fresh fetch to populate the Log table and HUD
-      await loadData();
       setMessage(`✅ Success: Allocation confirmed for Node_${id}.`);
+      await loadData(); // Refresh UI
+      
     } catch (err) {
       console.error("Allocation Flow Failed:", err);
-      setMessage(`❌ System Error: Backend rejected the request. Check console (F12).`);
+      setMessage(`❌ System Error: Check backend logs.`);
     } finally {
       setIsAllocating(null);
       setTimeout(() => setMessage(''), 5000);
@@ -115,14 +110,14 @@ function App() {
       <header style={{ maxWidth: '1200px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #e2e8f0', paddingBottom: '25px' }}>
         <div>
           <h1 style={{ color: '#1e3a8a', margin: 0, fontSize: '3rem', fontWeight: '900', letterSpacing: '-0.04em' }}>SRA Admin Dashboard</h1>
-          <p style={{ color: '#64748b', fontWeight: '600', margin: '8px 0 0 0' }}>Lead Developer: Nabil Umer | Senior Capstone CSS 497</p>
+          <p style={{ color: '#64748b', fontWeight: '600', margin: '8px 0 0 0' }}>Lead Developer: Nabil Umer | CSS 497 Capstone</p>
         </div>
         <div style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800' }}>● SYSTEM ONLINE</div>
       </header>
 
       {message && <div style={{ maxWidth: '1200px', margin: '0 auto 25px auto', background: 'white', padding: '20px', borderRadius: '16px', borderLeft: '8px solid #3b82f6', fontWeight: '700', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>{message}</div>}
 
-      {/* 📊 ANALYTICS HUD */}
+      {/* HUD & GRID RENDERED BELOW (Keep your existing JSX) */}
       <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto' }}>
         <div style={{ display: 'flex', gap: '25px', marginBottom: '20px' }}>
           {[
@@ -138,7 +133,6 @@ function App() {
         </div>
       </section>
 
-      {/* 🛠️ DEPLOYMENT & SEARCH PANEL */}
       <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto', background: 'white', padding: '35px', borderRadius: '24px', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
         <form onSubmit={handleAddResource} style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
           <input type="text" placeholder="Node Name (e.g. NVIDIA H100)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '18px', flex: 2, borderRadius: '14px', border: '2px solid #e2e8f0', background: '#f8fafc' }} required />
@@ -152,7 +146,6 @@ function App() {
         />
       </section>
 
-      {/* 🖥️ HARDWARE GRID */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '30px', maxWidth: '1200px', margin: '0 auto 60px auto' }}>
         {filteredResources.map(res => (
           <div key={res.id} className="card-anim" style={{ background: 'white', padding: '40px', borderRadius: '28px', textAlign: 'center', position: 'relative', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: '0.3s' }}>
@@ -165,7 +158,6 @@ function App() {
         ))}
       </div>
 
-      {/* 📜 SYSTEM ACTIVITY LOG: Populated from 'bookings' state */}
       <section style={{ maxWidth: '1200px', margin: '0 auto 80px auto', background: 'white', padding: '40px', borderRadius: '28px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '20px' }}>
           <h3 style={{ margin: 0, fontWeight: '800', fontSize: '1.4rem', color: '#1e293b' }}>System Activity Log</h3>
@@ -197,4 +189,5 @@ function App() {
     </div>
   )
 }
+
 export default App
