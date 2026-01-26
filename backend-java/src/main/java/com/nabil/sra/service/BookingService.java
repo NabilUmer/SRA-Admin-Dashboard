@@ -32,3 +32,4 @@ public class BookingService {
         return bookingRepo.findAll().stream().map(b -> new BookingResponseDTO(b.getId(), b.getResource().getId(), b.getStartTime(), b.getEndTime(), "CONFIRMED")).collect(Collectors.toList());
     }
 }
+

@@ -5,189 +5,134 @@ function App() {
   const [bookings, setBookings] = useState([]);
   const [message, setMessage] = useState('');
   const [newName, setNewName] = useState('');
-  const [newQty, setNewQty] = useState(1);
-  const [newSpec, setNewSpec] = useState('24GB VRAM');
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAllocating, setIsAllocating] = useState(null);
 
-  // 1. Unified Dashboard Sync
   const loadData = async () => {
     try {
-      console.log("Fetching fresh data from backend...");
-      // FIXED: Added /api prefix to match Java Controllers
       const res = await fetch('http://localhost:8080/api/resources');
       const rData = await res.json();
       setResources(rData);
-
       const book = await fetch('http://localhost:8080/api/bookings');
       const bData = await book.json();
       setBookings(bData);
-    } catch (err) {
-      console.error("Dashboard sync failed. Is the Java server running?", err);
-    }
+    } catch (err) { console.error("Sync failed", err); }
   };
 
   useEffect(() => { loadData(); }, []);
 
-  // 2. Resource Deployment
-  const handleAddResource = async (e) => {
+  const handleDeploy = async (e) => {
     e.preventDefault();
-    try {
-      // FIXED: Changed to /api/resources/seed to match our new seed endpoint
-      await fetch('http://localhost:8080/api/resources/seed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: `${newName} (${newSpec})`, quantity: parseInt(newQty) })
-      });
-      setMessage(`🚀 Infrastructure: Node "${newName}" successfully deployed.`);
-      setNewName('');
-      loadData();
-    } catch (err) {
-      setMessage("❌ Error: Could not deploy hardware.");
-    }
-    setTimeout(() => setMessage(''), 4000);
+    await fetch('http://localhost:8080/api/resources/seed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newName, quantity: 1 })
+    });
+    setNewName('');
+    loadData();
   };
 
-  // 3. UPDATED: Allocation & Conflict Logic
   const handleBooking = async (id) => {
-    const target = resources.find(r => r.id === id);
-    if (!target || target.quantity <= 0) return;
-
     setIsAllocating(id);
-    
-    try {
-      // Step A: Send Request to BookingController
-      const bRes = await fetch('http://localhost:8080/api/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          resourceId: Number(id), 
-          // Testing with the fixed time window we used in terminal
-          startTime: "2026-01-25T10:00:00Z", 
-          endTime: "2026-01-25T12:00:00Z" 
-        })
-      });
+    const response = await fetch('http://localhost:8080/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        resourceId: id, 
+        startTime: new Date().toISOString(), 
+        endTime: new Date(Date.now() + 7200000).toISOString() 
+      })
+    });
 
-      // WEEK 3 SPECIAL: Handle 409 Conflict
-      if (bRes.status === 409) {
-        setMessage(`⚠️ CONFLICT: Node_${id} is already reserved for this time slot!`);
-        return;
-      }
-
-      if (!bRes.ok) throw new Error(`Server Error`);
-
-      setMessage(`✅ Success: Allocation confirmed for Node_${id}.`);
-      await loadData(); // Refresh UI
-      
-    } catch (err) {
-      console.error("Allocation Flow Failed:", err);
-      setMessage(`❌ System Error: Check backend logs.`);
-    } finally {
-      setIsAllocating(null);
-      setTimeout(() => setMessage(''), 5000);
+    if (response.status === 409) {
+      setMessage("?? CONFLICT: Node is already reserved!");
+    } else if (response.ok) {
+      setMessage("? SUCCESS: Node allocated!");
+      loadData();
     }
+    setIsAllocating(null);
+    setTimeout(() => setMessage(''), 5000);
   };
 
-  const handleClearLogs = () => {
-    if (window.confirm("⚠️ Wipe activity log?")) {
-      setBookings([]);
-      setMessage("🧹 System Activity Log cleared locally.");
-      setTimeout(() => setMessage(''), 4000);
-    }
+  const exportToCSV = () => {
+    if (bookings.length === 0) return;
+    const headers = ["ID", "ResourceID", "Time", "Status"];
+    const rows = bookings.map(b => [
+      `ALLOC-${b.id}`, 
+      b.resourceId, 
+      new Date(b.startTime).toLocaleString("en-US", {timeZone: "America/Los_Angeles"}), 
+      "CONFIRMED"
+    ]);
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `SRA_Audit_Log.csv`;
+    link.click();
   };
-
-  const filteredResources = resources.filter(res => res.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div style={{ margin: 0, padding: '40px', fontFamily: '"Inter", sans-serif', backgroundColor: '#f1f5f9', minHeight: '100vh', width: '100vw', position: 'absolute', left: 0, top: 0, boxSizing: 'border-box', color: '#0f172a' }}>
-      
-      <style>{`
-        ::selection { background: #bae6fd; color: #0c4a6e; }
-        input, select { color: #1e293b !important; font-weight: 600 !important; }
-        .card-anim:hover { transform: translateY(-8px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
-      `}</style>
-
-      <header style={{ maxWidth: '1200px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '2px solid #e2e8f0', paddingBottom: '25px' }}>
+    <div style={{ margin: 0, padding: '40px', fontFamily: '"Inter", sans-serif', backgroundColor: '#0f172a', minHeight: '100vh', width: '100vw', position: 'absolute', left: 0, top: 0, boxSizing: 'border-box', color: '#f8fafc' }}>
+      <header style={{ maxWidth: '1200px', margin: '0 auto 40px auto', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid #1e293b', paddingBottom: '25px' }}>
         <div>
-          <h1 style={{ color: '#1e3a8a', margin: 0, fontSize: '3rem', fontWeight: '900', letterSpacing: '-0.04em' }}>SRA Admin Dashboard</h1>
-          <p style={{ color: '#64748b', fontWeight: '600', margin: '8px 0 0 0' }}>Lead Developer: Nabil Umer | CSS 497 Capstone</p>
+          <h1 style={{ color: '#60a5fa', margin: 0, fontSize: '3rem', fontWeight: '900', letterSpacing: '-0.04em' }}>SRA Admin Dashboard</h1>
+          <p style={{ color: '#94a3b8', fontWeight: '600', margin: '8px 0 0 0' }}>Week 4: Administrative Observability | Nabil Umer</p>
         </div>
-        <div style={{ background: '#dcfce7', color: '#166534', padding: '6px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800' }}>● SYSTEM ONLINE</div>
+        <button onClick={exportToCSV} style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: '800' }}>Export Audit Log</button>
       </header>
 
-      {message && <div style={{ maxWidth: '1200px', margin: '0 auto 25px auto', background: 'white', padding: '20px', borderRadius: '16px', borderLeft: '8px solid #3b82f6', fontWeight: '700', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>{message}</div>}
+      {message && <div style={{ maxWidth: '1200px', margin: '0 auto 25px auto', background: '#1e293b', padding: '20px', borderRadius: '16px', borderLeft: '8px solid #3b82f6', fontWeight: '700' }}>{message}</div>}
 
-      {/* HUD & GRID RENDERED BELOW (Keep your existing JSX) */}
       <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto' }}>
-        <div style={{ display: 'flex', gap: '25px', marginBottom: '20px' }}>
-          {[
-            { label: 'Nodes', val: resources.length, border: '#3b82f6' },
-            { label: 'Allocations', val: bookings.length, border: '#1e3a8a' },
-            { label: 'Inventory', val: resources.reduce((acc, res) => acc + (res.quantity || 0), 0), border: '#10b981' }
-          ].map((stat, i) => (
-            <div key={i} style={{ background: 'white', padding: '30px', borderRadius: '24px', flex: 1, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', textAlign: 'center', borderTop: `6px solid ${stat.border}` }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '800', textTransform: 'uppercase' }}>{stat.label}</h4>
-              <p style={{ fontSize: '3.2rem', margin: 0, fontWeight: '900', color: '#1e293b' }}>{stat.val}</p>
+        <div style={{ display: 'flex', gap: '25px' }}>
+          {[{ label: 'NODES', val: resources.length }, { label: 'ALLOCATIONS', val: bookings.length }, { label: 'INVENTORY', val: resources.reduce((acc, res) => acc + (res.quantity || 0), 0) }].map((stat, i) => (
+            <div key={i} style={{ background: '#1e293b', padding: '30px', borderRadius: '24px', flex: 1, textAlign: 'center', borderTop: '6px solid #3b82f6' }}>
+              <h4 style={{ margin: '0 0 10px 0', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '800' }}>{stat.label}</h4>
+              <p style={{ fontSize: '3.2rem', margin: 0, fontWeight: '900' }}>{stat.val}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto', background: 'white', padding: '35px', borderRadius: '24px', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1)' }}>
-        <form onSubmit={handleAddResource} style={{ display: 'flex', gap: '20px', marginBottom: '30px' }}>
-          <input type="text" placeholder="Node Name (e.g. NVIDIA H100)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '18px', flex: 2, borderRadius: '14px', border: '2px solid #e2e8f0', background: '#f8fafc' }} required />
-          <select value={newSpec} onChange={e => setNewSpec(e.target.value)} style={{ padding: '18px', flex: 1, borderRadius: '14px', border: '2px solid #e2e8f0', background: '#f8fafc' }}>
-            <option>24GB VRAM</option><option>48GB VRAM</option><option>80GB VRAM</option>
-          </select>
-          <button type="submit" style={{ background: '#10b981', color: 'white', border: 'none', padding: '0 40px', borderRadius: '14px', cursor: 'pointer', fontWeight: '800' }}>Deploy Node</button>
+      <section style={{ maxWidth: '1200px', margin: '0 auto 40px auto', background: '#1e293b', padding: '35px', borderRadius: '24px' }}>
+        <form onSubmit={handleDeploy} style={{ display: 'flex', gap: '20px' }}>
+          <input type="text" placeholder="GPU Name (e.g. NVIDIA RTX 4090)" value={newName} onChange={e => setNewName(e.target.value)} style={{ padding: '18px', flex: 2, borderRadius: '14px', border: 'none', background: '#0f172a', color: 'white' }} required />
+          <button type="submit" style={{ background: '#3b82f6', color: 'white', border: 'none', padding: '0 40px', borderRadius: '14px', cursor: 'pointer', fontWeight: '800' }}>Deploy Node</button>
         </form>
-        <input type="text" placeholder="🔍 Filter infrastructure node list..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '20px', borderRadius: '14px', border: '1px solid #e2e8f0', background: 'white', fontWeight: '600' }} 
-        />
       </section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '30px', maxWidth: '1200px', margin: '0 auto 60px auto' }}>
-        {filteredResources.map(res => (
-          <div key={res.id} className="card-anim" style={{ background: 'white', padding: '40px', borderRadius: '28px', textAlign: 'center', position: 'relative', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', transition: '0.3s' }}>
-            <h3 style={{ color: '#1e293b', fontSize: '1.8rem', fontWeight: '900', marginBottom: '8px' }}>{res.name}</h3>
-            <p style={{ color: '#64748b', fontSize: '1.2rem', marginBottom: '35px' }}>Stock: <strong>{res.quantity}</strong> units</p>
-            <button onClick={() => handleBooking(res.id)} disabled={res.quantity <= 0 || isAllocating === res.id} style={{ background: isAllocating === res.id ? '#93c5fd' : (res.quantity > 0 ? '#1e3a8a' : '#e2e8f0'), color: 'white', border: 'none', padding: '20px', borderRadius: '18px', width: '100%', fontWeight: '800' }}>
-              {isAllocating === res.id ? 'Allocating...' : (res.quantity > 0 ? 'Reserve Node' : 'Out of Stock')}
-            </button>
-          </div>
-        ))}
+        {resources.map(res => {
+          const isBusy = bookings.some(b => b.resourceId === res.id);
+          return (
+            <div key={res.id} style={{ background: '#1e293b', padding: '40px', borderRadius: '28px', textAlign: 'center', border: isBusy ? '2px solid #ef4444' : '2px solid #10b981' }}>
+              <span style={{ color: isBusy ? '#ef4444' : '#10b981', fontWeight: 'bold' }}>{isBusy ? '? BUSY' : '? AVAILABLE'}</span>
+              <h3 style={{ fontSize: '1.8rem', fontWeight: '900', margin: '15px 0' }}>{res.name}</h3>
+              <p style={{ color: '#94a3b8', fontSize: '1.2rem', marginBottom: '35px' }}>Stock: <strong>{isBusy ? 0 : res.quantity}</strong> units</p>
+              <button onClick={() => handleBooking(res.id)} disabled={isBusy || isAllocating === res.id} style={{ background: isBusy ? '#475569' : '#1e3a8a', color: 'white', border: 'none', padding: '20px', borderRadius: '18px', width: '100%', fontWeight: '800', cursor: isBusy ? 'not-allowed' : 'pointer' }}>
+                {isBusy ? 'Reserved' : 'Reserve Node'}
+              </button>
+            </div>
+          );
+        })}
       </div>
 
-      <section style={{ maxWidth: '1200px', margin: '0 auto 80px auto', background: 'white', padding: '40px', borderRadius: '28px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #f1f5f9', paddingBottom: '20px' }}>
-          <h3 style={{ margin: 0, fontWeight: '800', fontSize: '1.4rem', color: '#1e293b' }}>System Activity Log</h3>
-          <button onClick={handleClearLogs} style={{ background: 'none', border: '1px solid #ef4444', color: '#ef4444', padding: '8px 16px', borderRadius: '10px', fontWeight: '700' }}>🗑️ Clear History</button>
-        </div>
-        <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: '20px' }}>
-          <thead>
-            <tr style={{ textAlign: 'left', color: '#94a3b8', fontSize: '0.85rem', textTransform: 'uppercase' }}>
-              <th style={{padding: '15px 20px'}}>Tracking ID</th><th>Status</th><th>Timestamp</th>
-            </tr>
-          </thead>
+      <section style={{ maxWidth: '1200px', margin: '0 auto 80px auto', background: '#1e293b', padding: '40px', borderRadius: '28px' }}>
+        <h3 style={{ borderBottom: '1px solid #334155', paddingBottom: '20px', marginBottom: '20px' }}>System Activity Log</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr style={{ textAlign: 'left', color: '#94a3b8' }}><th>Tracking ID</th><th>Status</th><th>Timestamp (Local)</th></tr></thead>
           <tbody>
-            {bookings.length > 0 ? bookings.map(b => (
-              <tr key={b.id} style={{ borderBottom: '1px solid #f8fafc' }}>
-                <td style={{padding: '20px', fontWeight: '700', color: '#1e3a8a'}}>#ALLOC-{b.id}</td>
-                <td><span style={{ color: '#10b981', background: '#ecfdf5', padding: '5px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '800' }}>SUCCESS</span></td>
-                <td style={{color: '#64748b', fontSize: '0.9rem'}}>{new Date(b.startTime).toLocaleTimeString()}</td>
+            {bookings.map(b => (
+              <tr key={b.id} style={{ borderBottom: '1px solid #0f172a' }}>
+                <td style={{padding: '20px', fontWeight: 'bold'}}>#ALLOC-{b.id}</td>
+                <td><span style={{ color: '#10b981', background: '#064e3b', padding: '5px 12px', borderRadius: '8px' }}>SUCCESS</span></td>
+                <td>{new Date(b.startTime).toLocaleString("en-US", {timeZone: "America/Los_Angeles"})}</td>
               </tr>
-            )) : (
-              <tr>
-                <td colSpan="3" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8', fontStyle: 'italic' }}>
-                  No allocations recorded. Reserve a node to generate logs.
-                </td>
-              </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </section>
     </div>
   )
 }
-
-export default App
+export default App;
